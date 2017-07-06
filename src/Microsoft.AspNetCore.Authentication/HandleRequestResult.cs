@@ -43,7 +43,18 @@ namespace Microsoft.AspNetCore.Authentication
         /// <returns>The result.</returns>
         public static new HandleRequestResult Fail(Exception failure)
         {
-            return new HandleRequestResult() { Failure = failure };
+            return new HandleRequestResult() { Error = new AuthenticationError(failure) };
+        }
+
+        /// <summary>
+        /// Indicates that there was a failure during authentication.
+        /// </summary>
+        /// <param name="failure">The failure exception.</param>
+        /// <param name="properties">Additional state values for the authentication session.</param>
+        /// <returns>The result.</returns>
+        public static new HandleRequestResult Fail(Exception failure, AuthenticationProperties properties)
+        {
+            return new HandleRequestResult() { Error = new AuthenticationError(failure, properties) };
         }
 
         /// <summary>
@@ -52,9 +63,16 @@ namespace Microsoft.AspNetCore.Authentication
         /// <param name="failureMessage">The failure message.</param>
         /// <returns>The result.</returns>
         public static new HandleRequestResult Fail(string failureMessage)
-        {
-            return new HandleRequestResult() { Failure = new Exception(failureMessage) };
-        }
+            => Fail(new Exception(failureMessage));
+
+        /// <summary>
+        /// Indicates that there was a failure during authentication.
+        /// </summary>
+        /// <param name="failureMessage">The failure message.</param>
+        /// <param name="properties">Additional state values for the authentication session.</param>
+        /// <returns>The result.</returns>
+        public static new HandleRequestResult Fail(string failureMessage, AuthenticationProperties properties)
+            => Fail(new Exception(failureMessage), properties);
 
         /// <summary>
         /// Discontinue all processing for this request and return to the client.

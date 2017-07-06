@@ -11,6 +11,7 @@ namespace Microsoft.AspNetCore.Authentication
     /// </summary>
     public class RemoteFailureContext : HandleRequestContext<RemoteAuthenticationOptions>
     {
+        [Obsolete]
         public RemoteFailureContext(
             HttpContext context,
             AuthenticationScheme scheme,
@@ -21,9 +22,31 @@ namespace Microsoft.AspNetCore.Authentication
             Failure = failure;
         }
 
+        public RemoteFailureContext(
+            HttpContext context,
+            AuthenticationScheme scheme,
+            RemoteAuthenticationOptions options)
+            : base(context, scheme, options)
+        {
+        }
+
         /// <summary>
         /// User friendly error message for the error.
         /// </summary>
-        public Exception Failure { get; set; }
+        public Exception Failure
+        {
+            get => Error?.Failure;
+            set => Error = value == null ? new AuthenticationError(value, Properties) : null;
+        }
+
+        /// <summary>
+        /// Additional state values for the authentication session.
+        /// </summary>
+        public AuthenticationProperties Properties => Error?.Properties;
+
+        /// <summary>
+        /// Holds error information from the authentication.
+        /// </summary>
+        public AuthenticationError Error { get; set; }
     }
 }

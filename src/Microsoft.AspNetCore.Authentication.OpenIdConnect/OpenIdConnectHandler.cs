@@ -491,12 +491,17 @@ namespace Microsoft.AspNetCore.Authentication.OpenIdConnect
                 return HandleRequestResult.Fail("No message.");
             }
 
+            AuthenticationProperties properties = null;
             try
             {
-                AuthenticationProperties properties = null;
                 if (!string.IsNullOrEmpty(authorizationResponse.State))
                 {
                     properties = Options.StateDataFormat.Unprotect(authorizationResponse.State);
+
+                    if (properties != null && properties.Items.TryGetValue(OpenIdConnectDefaults.UserstatePropertiesKey, out var userstate))
+                    {
+                        authorizationResponse.State = userstate;
+                    }
                 }
 
                 var messageReceivedContext = await RunMessageReceivedEventAsync(authorizationResponse, properties);
@@ -523,6 +528,11 @@ namespace Microsoft.AspNetCore.Authentication.OpenIdConnect
 
                     // if state exists and we failed to 'unprotect' this is not a message we should process.
                     properties = Options.StateDataFormat.Unprotect(authorizationResponse.State);
+
+                    if (properties != null && properties.Items.TryGetValue(OpenIdConnectDefaults.UserstatePropertiesKey, out var userstate))
+                    {
+                        authorizationResponse.State = userstate;
+                    }
                 }
 
                 if (properties == null)
@@ -536,18 +546,15 @@ namespace Microsoft.AspNetCore.Authentication.OpenIdConnect
                     return HandleRequestResult.Fail(Resources.MessageStateIsInvalid);
                 }
 
-                properties.Items.TryGetValue(OpenIdConnectDefaults.UserstatePropertiesKey, out string userstate);
-                authorizationResponse.State = userstate;
-
                 if (!ValidateCorrelationId(properties))
                 {
-                    return HandleRequestResult.Fail("Correlation failed.");
+                    return HandleRequestResult.Fail("Correlation failed.", properties);
                 }
 
                 // if any of the error fields are set, throw error null
                 if (!string.IsNullOrEmpty(authorizationResponse.Error))
                 {
-                    return HandleRequestResult.Fail(CreateOpenIdConnectProtocolException(authorizationResponse, response: null));
+                    return HandleRequestResult.Fail(CreateOpenIdConnectProtocolException(authorizationResponse, response: null), properties);
                 }
 
                 if (_configuration == null && Options.ConfigurationManager != null)
@@ -635,8 +642,7 @@ namespace Microsoft.AspNetCore.Authentication.OpenIdConnect
 
                     // At least a cursory validation is required on the new IdToken, even if we've already validated the one from the authorization response.
                     // And we'll want to validate the new JWT in ValidateTokenResponse.
-                    JwtSecurityToken tokenEndpointJwt;
-                    var tokenEndpointUser = ValidateToken(tokenEndpointResponse.IdToken, properties, validationParameters, out tokenEndpointJwt);
+                    var tokenEndpointUser = ValidateToken(tokenEndpointResponse.IdToken, properties, validationParameters, out var tokenEndpointJwt);
 
                     // Avoid reading & deleting the nonce cookie, running the event, etc, if it was already done as part of the authorization response validation.
                     if (user == null)
@@ -722,7 +728,7 @@ namespace Microsoft.AspNetCore.Authentication.OpenIdConnect
                     return authenticationFailedContext.Result;
                 }
 
-                return HandleRequestResult.Fail(exception);
+                return HandleRequestResult.Fail(exception, properties);
             }
         }
 
@@ -830,7 +836,7 @@ namespace Microsoft.AspNetCore.Authentication.OpenIdConnect
             }
             else
             {
-                return HandleRequestResult.Fail("Unknown response type: " + contentType.MediaType);
+                return HandleRequestResult.Fail("Unknown response type: " + contentType.MediaType, properties);
             }
 
             var userInformationReceivedContext = await RunUserInformationReceivedEventAsync(principal, properties, message, user);
